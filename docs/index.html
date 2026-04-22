@@ -1,0 +1,487 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CSI Link Builder</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        :root { --radius: 10px; }
+        body {
+            font-family: system-ui, -apple-system, sans-serif;
+            min-height: 100vh;
+            background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
+            color: #e2e8f0;
+        }
+        .shell { max-width: 1000px; margin: 0 auto; padding: 2rem 1.5rem; }
+        .topbar { display: flex; align-items: center; justify-content: space-between; margin-bottom: 2rem; }
+        .topbar h1 { font-size: 1.4rem; font-weight: 700; letter-spacing: -0.5px; }
+        .topbar span.brand { color: #38bdf8; }
+        .pill { font-size: 0.75rem; padding: 4px 10px; border-radius: 20px; background: rgba(56,189,248,0.15); color: #38bdf8; border: 1px solid rgba(56,189,248,0.3); }
+
+        .panel {
+            background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.08);
+            border-radius: var(--radius); padding: 1.25rem; margin-bottom: 1rem;
+            backdrop-filter: blur(8px); position: relative;
+        }
+        .panel.dropdown-open { z-index: 20; }
+        .panel-title {
+            font-size: 0.8rem; text-transform: uppercase; letter-spacing: 1px;
+            color: #94a3b8; margin-bottom: 0.75rem; font-weight: 600;
+        }
+
+        .chip-group { display: flex; flex-wrap: wrap; gap: 6px; }
+        .chip {
+            padding: 5px 12px; border-radius: 20px; font-size: 0.82rem; cursor: pointer;
+            border: 1px solid rgba(255,255,255,0.12); background: rgba(255,255,255,0.05);
+            color: #cbd5e1; transition: all 0.2s; user-select: none;
+        }
+        .chip:hover { background: rgba(56,189,248,0.1); border-color: rgba(56,189,248,0.3); }
+        .chip.active { background: rgba(56,189,248,0.2); border-color: #38bdf8; color: #fff; box-shadow: 0 0 8px rgba(56,189,248,0.15); }
+
+        .dropdown { position: relative; z-index: 10; }
+        .dropdown-toggle {
+            width: 100%; padding: 9px 14px; border-radius: 8px; font-size: 0.85rem;
+            border: 1px solid rgba(255,255,255,0.12); background: rgba(0,0,0,0.25);
+            color: #cbd5e1; cursor: pointer; display: flex; align-items: center;
+            justify-content: space-between; transition: border-color 0.2s; user-select: none;
+        }
+        .dropdown-toggle:hover { border-color: rgba(255,255,255,0.25); }
+        .dropdown-toggle.open { border-color: #38bdf8; }
+        .dropdown-toggle .arrow { transition: transform 0.2s; font-size: 0.7rem; }
+        .dropdown-toggle.open .arrow { transform: rotate(180deg); }
+        .dropdown-menu {
+            display: none; position: absolute; top: calc(100% + 4px); left: 0; right: 0;
+            background: #1e293b; border: 1px solid rgba(255,255,255,0.1);
+            border-radius: 8px; max-height: 280px; overflow-y: auto; z-index: 100;
+            box-shadow: 0 8px 24px rgba(0,0,0,0.4); padding: 4px;
+        }
+        .dropdown-menu.show { display: block; }
+        .dropdown-item {
+            display: flex; align-items: center; gap: 8px; padding: 7px 12px;
+            border-radius: 6px; font-size: 0.83rem; color: #94a3b8;
+            cursor: pointer; transition: all 0.15s; user-select: none;
+        }
+        .dropdown-item:hover { background: rgba(255,255,255,0.06); color: #e2e8f0; }
+        .dropdown-item.selected { color: #e2e8f0; }
+        .dropdown-item .check {
+            width: 16px; height: 16px; border-radius: 4px; flex-shrink: 0;
+            border: 1.5px solid rgba(255,255,255,0.2); display: flex;
+            align-items: center; justify-content: center; font-size: 0.65rem; transition: all 0.15s;
+        }
+        .dropdown-item.selected .check::after { content: '✓'; }
+        .dropdown-item.selected .check { background: #38bdf8; border-color: #38bdf8; color: #0f172a; }
+        .dropdown-item.selected .check.purple { background: #8b5cf6; border-color: #8b5cf6; }
+        .selected-tags { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 8px; }
+        .tag { padding: 2px 10px; border-radius: 12px; font-size: 0.75rem; background: rgba(56,189,248,0.15); color: #7dd3fc; border: 1px solid rgba(56,189,248,0.25); }
+        .tag.purple { background: rgba(139,92,246,0.15); color: #c4b5fd; border-color: rgba(139,92,246,0.25); }
+        .tag.green { background: rgba(52,211,153,0.15); color: #6ee7b7; border-color: rgba(52,211,153,0.25); }
+
+        .custom-input, .inline-input {
+            margin-top: 10px; width: 100%; padding: 8px 12px; border-radius: 6px;
+            border: 1px solid rgba(255,255,255,0.1); background: rgba(0,0,0,0.2);
+            color: #e2e8f0; font-size: 0.85rem; outline: none; transition: border-color 0.2s;
+        }
+        .custom-input:focus, .inline-input:focus { border-color: #8b5cf6; }
+        .custom-input::placeholder, .inline-input::placeholder { color: #475569; }
+        .inline-input { margin-top: 0; }
+
+        textarea {
+            width: 100%; min-height: 90px; padding: 10px 12px; border-radius: 8px;
+            border: 1px solid rgba(255,255,255,0.1); background: rgba(0,0,0,0.25);
+            color: #e2e8f0; font-size: 0.9rem; resize: vertical; outline: none;
+            font-family: 'SF Mono', 'Cascadia Code', monospace; transition: border-color 0.2s;
+        }
+        textarea:focus { border-color: #38bdf8; }
+        textarea::placeholder { color: #475569; }
+
+        .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+        .grid2 label { font-size: 0.78rem; color: #94a3b8; margin-bottom: 4px; display: block; }
+
+        .actions { display: flex; gap: 8px; margin-top: 12px; flex-wrap: wrap; }
+        .btn {
+            padding: 9px 20px; border: none; border-radius: 8px; font-size: 0.88rem;
+            font-weight: 600; cursor: pointer; transition: all 0.2s;
+        }
+        .btn:hover { transform: translateY(-1px); }
+        .btn-gen { background: #38bdf8; color: #0f172a; }
+        .btn-gen:hover { background: #7dd3fc; }
+        .btn-open { background: rgba(139,92,246,0.2); color: #c4b5fd; border: 1px solid rgba(139,92,246,0.3); }
+        .btn-open:hover { background: rgba(139,92,246,0.35); }
+        .btn-copy { background: rgba(255,255,255,0.06); color: #94a3b8; border: 1px solid rgba(255,255,255,0.1); }
+        .btn-copy:hover { background: rgba(255,255,255,0.12); color: #e2e8f0; }
+        .btn-clear { background: rgba(239,68,68,0.1); color: #f87171; border: 1px solid rgba(239,68,68,0.2); }
+        .btn-clear:hover { background: rgba(239,68,68,0.25); }
+
+        .collapse-toggle {
+            cursor: pointer; user-select: none; display: flex; align-items: center; gap: 6px;
+        }
+        .collapse-toggle .caret { transition: transform 0.2s; font-size: 0.7rem; }
+        .collapse-toggle.open .caret { transform: rotate(90deg); }
+        .collapse-body { display: none; margin-top: 12px; }
+        .collapse-body.show { display: block; }
+
+        .output {
+            margin-top: 1rem; border-radius: 8px; background: rgba(0,0,0,0.3);
+            border: 1px solid rgba(255,255,255,0.06); max-height: 400px; overflow-y: auto; display: none;
+        }
+        .output a {
+            display: block; padding: 8px 14px; color: #38bdf8; text-decoration: none;
+            font-size: 0.78rem; font-family: 'SF Mono', 'Cascadia Code', monospace;
+            border-bottom: 1px solid rgba(255,255,255,0.04); transition: background 0.15s;
+            word-break: break-all;
+        }
+        .output a:last-child { border-bottom: none; }
+        .output a:hover { background: rgba(56,189,248,0.08); }
+        .counter { font-size: 0.75rem; color: #64748b; margin-top: 6px; text-align: right; }
+
+        .toast-area { position: fixed; top: 20px; right: 20px; z-index: 999; display: flex; flex-direction: column; gap: 8px; }
+        .toast-msg {
+            padding: 10px 16px; border-radius: 8px; font-size: 0.85rem;
+            background: #1e293b; border: 1px solid rgba(255,255,255,0.1);
+            box-shadow: 0 4px 20px rgba(0,0,0,0.4); animation: fadeIn 0.25s ease; color: #e2e8f0;
+        }
+        .toast-msg.ok { border-left: 3px solid #34d399; }
+        .toast-msg.warn { border-left: 3px solid #fbbf24; }
+        .toast-msg.err { border-left: 3px solid #f87171; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(-8px); } to { opacity: 1; transform: translateY(0); } }
+
+        @media (max-width: 600px) {
+            .shell { padding: 1rem; }
+            .actions { flex-direction: column; }
+            .btn { width: 100%; text-align: center; }
+            .grid2 { grid-template-columns: 1fr; }
+        }
+    </style>
+</head>
+<body>
+<div class="shell">
+    <div class="topbar">
+        <h1><span class="brand">CSI</span> Link Builder</h1>
+        <span class="pill">v2.0</span>
+    </div>
+
+    <div class="panel">
+        <div class="panel-title">View Type</div>
+        <div class="chip-group" id="viewChips"></div>
+    </div>
+
+    <div class="panel">
+        <div class="panel-title">ASINs / Item IDs</div>
+        <textarea id="asinBox" placeholder="B0XXXXXX&#10;B0YYYYYY&#10;每行一个，或用逗号/空格分隔"></textarea>
+    </div>
+
+    <div class="panel">
+        <div class="panel-title">Marketplace</div>
+        <div class="dropdown" id="mpDropdown">
+            <div class="dropdown-toggle" id="mpToggle">
+                <span>选择站点...</span>
+                <span class="arrow">▼</span>
+            </div>
+            <div class="dropdown-menu" id="mpMenu"></div>
+            <div class="selected-tags" id="mpTags"></div>
+        </div>
+    </div>
+
+    <div class="panel">
+        <div class="panel-title">Region / Realm</div>
+        <div class="chip-group" id="regionChips"></div>
+    </div>
+
+    <div class="panel" id="attrPanel">
+        <div class="panel-title">Search Attributes (Blame-O)</div>
+        <div class="dropdown" id="attrDropdown">
+            <div class="dropdown-toggle" id="attrToggle">
+                <span>选择属性...</span>
+                <span class="arrow">▼</span>
+            </div>
+            <div class="dropdown-menu" id="attrMenu"></div>
+            <div class="selected-tags" id="attrTags"></div>
+        </div>
+        <input class="custom-input" id="customAttr" placeholder="自定义属性，逗号分隔...">
+    </div>
+
+    <div class="panel">
+        <div class="collapse-toggle" id="advToggle">
+            <span class="caret">▶</span>
+            <span class="panel-title" style="margin-bottom:0">Advanced Parameters (可选)</span>
+        </div>
+        <div class="collapse-body" id="advBody">
+            <div class="grid2" style="margin-top:8px;">
+                <div><label>Customer ID</label><input class="inline-input" id="fCustomerId" placeholder=""></div>
+                <div><label>Merchant ID</label><input class="inline-input" id="fMerchantId" placeholder=""></div>
+                <div><label>SKU</label><input class="inline-input" id="fSku" placeholder=""></div>
+                <div><label>FN SKU</label><input class="inline-input" id="fFnSku" placeholder=""></div>
+                <div><label>GCID</label><input class="inline-input" id="fGcid" placeholder=""></div>
+                <div><label>Fulfillment Channel</label><input class="inline-input" id="fFulfillment" placeholder=""></div>
+                <div><label>Listing Type</label><input class="inline-input" id="fListingType" placeholder="purchasable" value="purchasable"></div>
+                <div><label>Submission ID</label><input class="inline-input" id="fSubmissionId" placeholder=""></div>
+                <div><label>Order ID</label><input class="inline-input" id="fOrderId" placeholder=""></div>
+                <div><label>External ID</label><input class="inline-input" id="fExternalId" placeholder=""></div>
+                <div><label>Domain ID</label><input class="inline-input" id="fDomainId" placeholder=""></div>
+                <div><label>Keyword</label><input class="inline-input" id="fKeyword" placeholder=""></div>
+            </div>
+        </div>
+    </div>
+
+    <div class="panel">
+        <div class="actions">
+            <button class="btn btn-gen" id="genBtn">Generate</button>
+            <button class="btn btn-open" id="openBtn" style="display:none">Open All</button>
+            <button class="btn btn-copy" id="copyBtn" style="display:none">Copy All</button>
+            <button class="btn btn-clear" id="clearBtn">Clear</button>
+        </div>
+        <div class="output" id="output"></div>
+        <div class="counter" id="counter"></div>
+    </div>
+</div>
+<div class="toast-area" id="toasts"></div>
+<script>
+(function () {
+    const VIEWS = [
+        { key: 'blame_o', label: 'Blame-O' },
+        { key: 'media_ranker', label: 'Image Ranking Debugger' },
+        { key: 'simple_product_data', label: 'Simple Product Data' }
+    ];
+    const REGIONS = [
+        { key: 'NA', realm: 'USAmazon', label: 'NA (US/CA/MX/BR)' },
+        { key: 'EU', realm: 'EUAmazon', label: 'EU (UK/DE/FR/IT/ES…)' },
+        { key: 'FE', realm: 'FEAmazon', label: 'FE (JP/AU/SG)' },
+        { key: 'IN', realm: 'INAmazon', label: 'IN' }
+    ];
+    const MPS = [
+        ['Global','78401'],['US','1'],['UK','3'],['DE','4'],['FR','5'],['IT','35691'],['ES','44551'],
+        ['JP','6'],['CA','7'],['MX','771770'],['BR','526970'],['AU','111172'],
+        ['NL','328451'],['AE','338801'],['SA','338811'],['TR','338851'],
+        ['EG','623225021'],['BE','679831071'],['IE','753556201'],
+        ['ZA','680844071'],['SE','704403121'],['PL','712115121'],['IN','44571']
+    ];
+    const ATTRS = [
+        'item_name','bullet_point','product_description','item_description',
+        'list_price','manufacturer','brand','global_catalog_owner',
+        'model_name','model_number','part_number','color','size','style',
+        'item_length_width','number_of_items','is_expiration_dated_product',
+        'display_on_website','item_type_keyword','gl_product_group_type',
+        'product_type','product_site_launch_date','merchant_release_date',
+        'validator_issues','material','customer_return_policy',
+        'care_instructions','fabric_type','generic_keyword'
+    ];
+    const REGION_MP_MAP = {
+        NA: ['1','7','771770','526970'],
+        EU: ['3','4','5','35691','44551','328451','338801','338811','338851','623225021','679831071','753556201','680844071','704403121','712115121'],
+        FE: ['6','111172'],
+        IN: ['44571']
+    };
+
+    const el = id => document.getElementById(id);
+    let urls = [];
+
+    function toast(msg, type) {
+        const t = document.createElement('div');
+        t.className = 'toast-msg ' + (type || '');
+        t.textContent = msg;
+        el('toasts').appendChild(t);
+        setTimeout(() => { t.style.opacity = '0'; setTimeout(() => t.remove(), 300); }, 2800);
+    }
+
+    function closeAllDropdowns() {
+        document.querySelectorAll('.dropdown-menu').forEach(m => m.classList.remove('show'));
+        document.querySelectorAll('.dropdown-toggle').forEach(t => t.classList.remove('open'));
+        document.querySelectorAll('.panel.dropdown-open').forEach(p => p.classList.remove('dropdown-open'));
+    }
+    document.addEventListener('click', closeAllDropdowns);
+
+    function buildDropdown(toggleId, menuId, tagsId, items, tagColor) {
+        const toggle = el(toggleId), menu = el(menuId), tags = el(tagsId);
+        const selected = new Set();
+        items.forEach(([label, value]) => {
+            const item = document.createElement('div');
+            item.className = 'dropdown-item';
+            item.dataset.val = value;
+            item.innerHTML = '<span class="check ' + (tagColor || '') + '"></span><span>' + label + '</span>';
+            item.addEventListener('click', e => {
+                e.stopPropagation();
+                if (selected.has(value)) { selected.delete(value); item.classList.remove('selected'); }
+                else { selected.add(value); item.classList.add('selected'); }
+                renderTags(); updateText();
+            });
+            menu.appendChild(item);
+        });
+        toggle.addEventListener('click', e => {
+            e.stopPropagation();
+            const isOpen = menu.classList.contains('show');
+            closeAllDropdowns();
+            if (!isOpen) { menu.classList.add('show'); toggle.classList.add('open'); toggle.closest('.panel').classList.add('dropdown-open'); }
+        });
+        function renderTags() {
+            tags.innerHTML = '';
+            selected.forEach(val => {
+                const found = items.find(i => i[1] === val);
+                if (!found) return;
+                const tag = document.createElement('span');
+                tag.className = 'tag' + (tagColor ? ' ' + tagColor : '');
+                tag.textContent = found[0];
+                tags.appendChild(tag);
+            });
+        }
+        function updateText() {
+            const label = toggle.querySelector('span:first-child');
+            label.textContent = selected.size ? selected.size + ' selected' : toggle.dataset.ph;
+        }
+        toggle.dataset.ph = toggle.querySelector('span:first-child').textContent;
+        return {
+            getSelected: () => Array.from(selected),
+            setSelected: vals => {
+                selected.clear();
+                menu.querySelectorAll('.dropdown-item').forEach(i => {
+                    if (vals.includes(i.dataset.val)) { selected.add(i.dataset.val); i.classList.add('selected'); }
+                    else { i.classList.remove('selected'); }
+                });
+                renderTags(); updateText();
+            },
+            clear: () => { selected.clear(); menu.querySelectorAll('.dropdown-item').forEach(i => i.classList.remove('selected')); tags.innerHTML = ''; updateText(); }
+        };
+    }
+
+    function makeChip(container, text, cls) {
+        const c = document.createElement('div');
+        c.className = cls;
+        c.textContent = text;
+        c.addEventListener('click', () => {
+            container.querySelectorAll('.' + cls).forEach(x => x.classList.remove('active'));
+            c.classList.add('active');
+        });
+        container.appendChild(c);
+        return c;
+    }
+
+    const viewContainer = el('viewChips');
+    VIEWS.forEach((v, i) => {
+        const c = makeChip(viewContainer, v.label, 'chip');
+        c.dataset.key = v.key;
+        if (i === 0) c.classList.add('active');
+    });
+
+    const regionContainer = el('regionChips');
+    REGIONS.forEach((r, i) => {
+        const c = makeChip(regionContainer, r.label, 'chip');
+        c.dataset.key = r.key;
+        c.dataset.realm = r.realm;
+        if (i === 0) c.classList.add('active');
+    });
+
+    const mpDD = buildDropdown('mpToggle', 'mpMenu', 'mpTags', MPS.map(([n, v]) => [n, v]));
+    const attrDD = buildDropdown('attrToggle', 'attrMenu', 'attrTags', ATTRS.map(a => [a.replace(/_/g, ' '), a]), 'purple');
+
+    el('advToggle').addEventListener('click', () => {
+        el('advToggle').classList.toggle('open');
+        el('advBody').classList.toggle('show');
+    });
+
+    function syncAttrVisibility() {
+        const view = viewContainer.querySelector('.chip.active')?.dataset.key;
+        el('attrPanel').style.display = (view === 'blame_o') ? '' : 'none';
+    }
+    viewContainer.addEventListener('click', syncAttrVisibility);
+
+    function parseAsins() {
+        return el('asinBox').value.trim().split(/[\n,\s，、]+/).filter(Boolean);
+    }
+
+    function getRegion() {
+        const chip = regionContainer.querySelector('.chip.active');
+        return { region: chip?.dataset.key || 'NA', realm: chip?.dataset.realm || 'USAmazon' };
+    }
+
+    el('genBtn').addEventListener('click', () => {
+        urls = [];
+        const asins = parseAsins();
+        if (!asins.length) { toast('请输入至少一个 ASIN', 'warn'); return; }
+        const mps = mpDD.getSelected();
+        if (!mps.length) { toast('请选择至少一个站点', 'warn'); return; }
+        const view = viewContainer.querySelector('.chip.active')?.dataset.key || 'blame_o';
+        const { region, realm } = getRegion();
+        const picked = attrDD.getSelected();
+        const custom = el('customAttr').value.split(/[,，]/).map(s => s.trim()).filter(Boolean);
+        const searchStr = [...picked, ...custom].join('|');
+        const adv = {
+            customer_id: el('fCustomerId').value.trim(),
+            merchant_id: el('fMerchantId').value.trim(),
+            sku: el('fSku').value.trim(),
+            fn_sku: el('fFnSku').value.trim(),
+            gcid: el('fGcid').value.trim(),
+            fulfillment_channel_code: el('fFulfillment').value.trim(),
+            listing_type: el('fListingType').value.trim(),
+            submission_id: el('fSubmissionId').value.trim(),
+            order_id: el('fOrderId').value.trim(),
+            external_id: el('fExternalId').value.trim(),
+            domain_id: el('fDomainId').value.trim(),
+            keyword: el('fKeyword').value.trim()
+        };
+        mps.forEach(mp => {
+            asins.forEach(asin => {
+                const params = new URLSearchParams();
+                params.set('view', view);
+                params.set('item_id', asin);
+                params.set('marketplace_id', mp);
+                params.set('customer_id', adv.customer_id);
+                params.set('merchant_id', adv.merchant_id);
+                params.set('sku', adv.sku);
+                params.set('fn_sku', adv.fn_sku);
+                params.set('gcid', adv.gcid);
+                params.set('fulfillment_channel_code', adv.fulfillment_channel_code);
+                params.set('listing_type', adv.listing_type);
+                params.set('submission_id', adv.submission_id);
+                params.set('order_id', adv.order_id);
+                params.set('external_id', adv.external_id);
+                params.set('page_token_provided', 'false');
+                if (view === 'blame_o' && searchStr) params.set('search_string', searchStr);
+                params.set('realm', realm);
+                params.set('region', region);
+                params.set('stage', 'prod');
+                params.set('domain_id', adv.domain_id);
+                params.set('keyword', adv.keyword);
+                params.set('submit', 'Show');
+                urls.push('https://csi.amazon.com/view?' + params.toString());
+            });
+        });
+        const out = el('output');
+        out.innerHTML = urls.map(u => '<a href="' + u + '" target="_blank" rel="noopener">' + u + '</a>').join('');
+        out.style.display = 'block';
+        el('openBtn').style.display = '';
+        el('copyBtn').style.display = '';
+        el('counter').textContent = urls.length + ' 条链接已生成';
+        toast(urls.length + ' links ready', 'ok');
+    });
+
+    el('openBtn').addEventListener('click', () => {
+        if (urls.length > 20) { if (!confirm('即将打开 ' + urls.length + ' 个标签页，确认？')) return; }
+        urls.forEach(u => window.open(u, '_blank'));
+    });
+
+    el('copyBtn').addEventListener('click', () => {
+        navigator.clipboard.writeText(urls.join('\n'))
+            .then(() => toast('已复制到剪贴板', 'ok'))
+            .catch(() => toast('复制失败', 'err'));
+    });
+
+    el('clearBtn').addEventListener('click', () => {
+        el('asinBox').value = '';
+        el('customAttr').value = '';
+        mpDD.clear(); attrDD.clear();
+        viewContainer.querySelector('.chip').click();
+        regionContainer.querySelector('.chip').click();
+        el('output').style.display = 'none';
+        el('output').innerHTML = '';
+        el('openBtn').style.display = 'none';
+        el('copyBtn').style.display = 'none';
+        el('counter').textContent = '';
+        urls = [];
+        document.querySelectorAll('#advBody input').forEach(i => {
+            i.value = i.id === 'fListingType' ? 'purchasable' : '';
+        });
+    });
+})();
+</script>
+</body>
+</html>
