@@ -423,7 +423,11 @@
                 const params = new URLSearchParams();
                 params.set('view', view);
                 params.set('item_id', asin);
-                params.set('marketplace_id', mp);
+                if (mp === '78401') {
+                    params.set('domain_id', mp);
+                } else {
+                    params.set('marketplace_id', mp);
+                }
                 params.set('customer_id', adv.customer_id);
                 params.set('merchant_id', adv.merchant_id);
                 params.set('sku', adv.sku);
